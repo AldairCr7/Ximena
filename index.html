@@ -370,6 +370,23 @@ const sleep = ms=> new Promise(r=>setTimeout(r,ms));
 const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
 const isTouch = matchMedia('(pointer:coarse)').matches || ('ontouchstart' in window);
 
+/* ==================================================================
+   🔔 ALERTA SILENCIOSA (ntfy.sh)
+   Cada vez que la experiencia llega al final (cuando aparece el botón
+   "Leer tu mensaje"), se manda un aviso a tu topic de ntfy, sin
+   mostrar absolutamente nada en pantalla.
+   ================================================================== */
+const NTFY_TOPIC = "Alerta-Aldair-Frappes-928471";
+function notifyEnd(){
+  try{
+    fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
+      method: "POST",
+      headers: { "Title": "Regalo Ximena" },
+      body: "Ximena llegó al final del regalo 🌹"
+    }).catch(()=>{});
+  }catch(e){ /* silencioso: nunca debe afectar la experiencia visual */ }
+}
+
 const sky=document.getElementById('sky'), sctx=sky.getContext('2d');
 const bloom=document.getElementById('bloom'), bctx=bloom.getContext('2d');
 let W=0,H=0,dpr=1;
@@ -444,6 +461,31 @@ function petalDraw(sp,x,y,s,rot,a){
 function glowDraw(ctx,sp,x,y,r,a){
   ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=a;
   ctx.drawImage(sp,x-r,y-r,r*2,r*2); ctx.restore();
+}
+/* Brillo con forma de X (usado por el punto de luz que sale de la caja) */
+function drawGlowX(cx,cy,arm,alpha,rot=0){
+  if(alpha<=0.01||arm<=0.5) return;
+  bctx.save();
+  bctx.translate(cx,cy); bctx.rotate(rot);
+  bctx.globalCompositeOperation='lighter';
+  bctx.globalAlpha=alpha;
+  bctx.strokeStyle='#fff6df';
+  bctx.lineCap='round';
+  bctx.lineWidth=Math.max(2,arm*0.16);
+  bctx.shadowColor='rgba(255,236,190,.95)';
+  bctx.shadowBlur=arm*1.1;
+  bctx.beginPath();
+  bctx.moveTo(-arm,-arm); bctx.lineTo(arm,arm);
+  bctx.moveTo(arm,-arm); bctx.lineTo(-arm,arm);
+  bctx.stroke();
+  bctx.restore();
+  // puntas y centro con un brillo extra (sensación de chispa, no solo línea)
+  const cos=Math.cos(rot), sin=Math.sin(rot);
+  const tips=[[-arm,-arm],[arm,arm],[arm,-arm],[-arm,arm],[0,0]];
+  for(const [lx,ly] of tips){
+    const wx=cx+lx*cos-ly*sin, wy=cy+lx*sin+ly*cos;
+    glowDraw(bctx, glowWhite, wx, wy, arm*0.34, alpha*0.9);
+  }
 }
 
 /* ================= ESTADO ================= */
@@ -699,7 +741,8 @@ function updateBloom(now){
   // punto de luz que se eleva desde la caja
   if(seedActive){
     const p=clamp((now-seedT0)/2400,0,1), y=H*0.62+(H*0.42-H*0.62)*easeOut(p), r=8+easeOut(p)*40;
-    glowDraw(bctx,glowWhite,W/2,y,r,.9); glowDraw(bctx,glowGold,W/2,y,r*1.6,.5*p);
+    glowDraw(bctx,glowGold,W/2,y,r*1.7,.4*p);           // halo dorado suave detrás
+    drawGlowX(W/2,y,r*1.15,.95,p*0.9);                  // el brillo asciende con forma de X
   }
   // pétalos que trae el viento (más intenso mientras se forma la rosa)
   if(state==='gift' && bloomStarted){
@@ -894,6 +937,7 @@ async function orchestrateGift(){
   await sleep(2500);                                // el texto permanece
   dim.style.opacity='0.42';
   readMsg.classList.add('on');                      // "Leer tu mensaje" justo debajo del texto
+  notifyEnd();                                       // 🔔 llegó al final: alerta silenciosa a ntfy
 }
 
 /* ---- Carta ---- */
