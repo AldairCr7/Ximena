@@ -710,14 +710,37 @@ function sampleText(lines){
 }
 function downsample(arr,n){ if(arr.length<=n) return arr; const o=[],st=arr.length/n; for(let i=0;i<n;i++) o.push(arr[Math.floor(i*st)]); return o; }
 
+/* Puntos de un corazón pequeño (curva paramétrica clásica), para el detalle discreto abajo a la derecha */
+function sampleHeart(cx,cy,size,count){
+  const pts=[], scale=size/16;
+  for(let i=0;i<count;i++){
+    const t=(i/count)*TAU;
+    const x=16*Math.pow(Math.sin(t),3);
+    const y=13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+    pts.push({x:cx + x*scale, y:cy - y*scale});   // -y para que el corazón quede orientado hacia arriba en canvas
+  }
+  return pts;
+}
+
 function applyText(){
   bloomMode='text';
   let pts=sampleText(['Feliz','Cumpleaños','Ximena']); pts.sort((a,b)=>a.x-b.x);
-  const n=N(); if(pts.length>n) pts=downsample(pts,n);
+  const n=N();
+  // reservamos un pequeño grupo de pétalos para un corazón discreto abajo a la derecha
+  const heartCount = isMobile?26:40;
+  if(pts.length>n-heartCount) pts=downsample(pts, n-heartCount);
   const cx=W/2, cy=H*0.45;
+  const heartSize=Math.min(W,H)*0.05;
+  const heartCx=W-Math.max(56,W*0.085), heartCy=H-Math.max(64,H*0.095);
+  const heartPts=sampleHeart(heartCx,heartCy,heartSize,heartCount);
   f={cx,cy,spin:0,breathAmp:.003,breathSpeed:.0016,t0:performance.now(),seq:false,glow:true,glowSprite:glowGold,glowMul:.26,easeMul:.5,idle:5,windSway:4,push:1,pushTarget:1,pushRate:.004};
   for(let i=0;i<n;i++){ const p=petals[i];
     if(i<pts.length){ p.ox=pts[i].x-cx; p.oy=pts[i].y-cy; p.talpha=1; p.tsize=(Math.min(W,H)/3800)*.5; p.baseRot=(Math.random()-.5)*.28; p.delay=(pts[i].x/W)*1700+Math.random()*220; p.variant=i%2?2:3; }
+    else if(i<pts.length+heartPts.length){
+      const hp=heartPts[i-pts.length];
+      p.ox=hp.x-cx; p.oy=hp.y-cy; p.talpha=1; p.tsize=(Math.min(W,H)/4200)*.55; p.baseRot=Math.random()*TAU;
+      p.delay=1900+Math.random()*700+(i-pts.length)*10; p.variant=0;               // rojo profundo, discreto
+    }
     else { p.talpha=0; p.delay=0; p.oy-=60; }
   }
   lastFormation=applyText;
